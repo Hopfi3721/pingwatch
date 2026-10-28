@@ -1,0 +1,9 @@
+.git
+.gitignore
+.env
+*.db
+*.db-shm
+*.db-wal
+pingwatch
+pingwatch.exe
+docs

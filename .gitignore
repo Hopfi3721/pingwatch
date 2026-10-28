@@ -1,0 +1,18 @@
+# Бинарники
+pingwatch
+pingwatch.exe
+/dist/
+
+# Локальная база и её WAL-файлы
+*.db
+*.db-shm
+*.db-wal
+
+# Секреты
+.env
+
+# ОС и редакторы
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

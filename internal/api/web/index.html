@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pingwatch — монитор доступности</title>
+<style>
+  :root {
+    --bg: #070b10;
+    --panel: #0f1620;
+    --panel-2: #131c28;
+    --border: #1e2938;
+    --text: #e6edf5;
+    --muted: #8296ad;
+    --up: #34d399;
+    --down: #f87171;
+    --unknown: #64748b;
+    --accent: #60a5fa;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(900px 500px at 15% -10%, rgba(96, 165, 250, 0.14), transparent 65%),
+      radial-gradient(700px 400px at 95% 0%, rgba(52, 211, 153, 0.10), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font: 15px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 20px 56px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand h1 {
+    margin: 0;
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    font-weight: 650;
+  }
+
+  .brand p {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .pulse {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--up);
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55);
+    animation: pulse 2.4s infinite;
+  }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.45); }
+    70% { box-shadow: 0 0 0 12px rgba(52, 211, 153, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+  }
+
+  .refresh {
+    color: var(--muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .refresh .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent), var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+  }
+
+  .card .label {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .card .value {
+    font-size: 28px;
+    font-weight: 650;
+    margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .card.up .value { color: var(--up); }
+  .card.down .value { color: var(--down); }
+  .card.unknown .value { color: var(--muted); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-2);
+  }
+
+  input, select, button {
+    font: inherit;
+    color: var(--text);
+    background: #0a111a;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 9px 12px;
+    outline: none;
+  }
+
+  input:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
+  }
+
+  input::placeholder { color: #54687f; }
+
+  input[name="name"] { flex: 1 1 170px; min-width: 150px; }
+  input[name="url"]  { flex: 3 1 320px; min-width: 220px; }
+
+  .select-wrap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--muted);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .select-wrap select { padding: 9px 8px; }
+
+  button.primary {
+    background: linear-gradient(180deg, #3b82f6, #2563eb);
+    border-color: #2563eb;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 9px 18px;
+  }
+
+  button.primary:hover { filter: brightness(1.08); }
+  button.primary:disabled { opacity: 0.6; cursor: progress; }
+
+  .error {
+    margin: 0;
+    padding: 12px 16px;
+    background: rgba(248, 113, 113, 0.12);
+    border-bottom: 1px solid rgba(248, 113, 113, 0.3);
+    color: #fecaca;
+    font-size: 13px;
+  }
+
+  .hidden { display: none; }
+
+  .table-scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 820px;
+  }
+
+  th {
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(30, 41, 56, 0.7);
+    vertical-align: middle;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(255, 255, 255, 0.015); }
+
+  .target-name {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .target-url {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 2px;
+    max-width: 340px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .target-error {
+    color: var(--down);
+    font-size: 12px;
+    margin-top: 3px;
+    max-width: 340px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+
+  .pill::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .pill.up { color: var(--up); background: rgba(52, 211, 153, 0.10); border-color: rgba(52, 211, 153, 0.28); }
+  .pill.down { color: var(--down); background: rgba(248, 113, 113, 0.10); border-color: rgba(248, 113, 113, 0.30); }
+  .pill.unknown { color: var(--muted); background: rgba(100, 116, 139, 0.12); border-color: rgba(100, 116, 139, 0.30); }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 13px;
+  }
+
+  .sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+  .spark {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 22px;
+    min-width: 92px;
+  }
+
+  .spark i {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 2px;
+    border-radius: 2px;
+    height: 100%;
+    background: var(--unknown);
+    opacity: 0.85;
+  }
+
+  .spark i.up { background: var(--up); }
+  .spark i.down { background: var(--down); height: 100%; }
+  .spark i.unknown { background: #334155; }
+
+  .spark-empty { color: #415166; font-size: 12px; }
+
+  button.remove {
+    background: transparent;
+    border-color: transparent;
+    color: #54687f;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 6px 9px;
+    border-radius: 8px;
+  }
+
+  button.remove:hover {
+    color: var(--down);
+    background: rgba(248, 113, 113, 0.10);
+  }
+
+  .empty {
+    padding: 44px 20px;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .empty strong { display: block; color: var(--text); margin-bottom: 4px; }
+
+  footer {
+    margin-top: 18px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    color: #54687f;
+    font-size: 12px;
+  }
+
+  footer code {
+    font-family: "Cascadia Mono", Consolas, monospace;
+    color: #7d92aa;
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 20px 12px 40px; }
+    .brand h1 { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <span class="pulse" aria-hidden="true"></span>
+      <div>
+        <h1>pingwatch</h1>
+        <p>Self-hosted монитор доступности: HTTP-проверки, история, алерты</p>
+      </div>
+    </div>
+    <div class="refresh"><span class="dot" aria-hidden="true"></span><span id="refresh-note">обновление каждые 5 с</span></div>
+  </header>
+
+  <section class="summary" aria-label="Сводка">
+    <div class="card">
+      <div class="label">Всего целей</div>
+      <div class="value" id="stat-total">—</div>
+    </div>
+    <div class="card up">
+      <div class="label">Доступны</div>
+      <div class="value" id="stat-up">—</div>
+    </div>
+    <div class="card down">
+      <div class="label">Недоступны</div>
+      <div class="value" id="stat-down">—</div>
+    </div>
+    <div class="card unknown">
+      <div class="label">Средний uptime</div>
+      <div class="value" id="stat-uptime">—</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <form id="add-form" autocomplete="off">
+      <input name="name" placeholder="Название, например API" maxlength="100" required>
+      <input name="url" type="url" placeholder="https://example.com/healthz" required>
+      <label class="select-wrap">каждые
+        <select name="interval_seconds" aria-label="Интервал проверки">
+          <option value="5">5 с</option>
+          <option value="10">10 с</option>
+          <option value="30" selected>30 с</option>
+          <option value="60">60 с</option>
+          <option value="300">5 мин</option>
+        </select>
+      </label>
+      <label class="select-wrap">таймаут
+        <select name="timeout_seconds" aria-label="Таймаут проверки">
+          <option value="1">1 с</option>
+          <option value="3">3 с</option>
+          <option value="5">5 с</option>
+          <option value="10" selected>10 с</option>
+        </select>
+      </label>
+      <button class="primary" type="submit" id="add-button">Добавить</button>
+    </form>
+
+    <p class="error hidden" id="error" role="alert"></p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Цель</th>
+            <th>Статус</th>
+            <th>Латентность</th>
+            <th>Uptime</th>
+            <th>Последние проверки</th>
+            <th>Проверено</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="empty hidden" id="empty">
+      <strong>Пока нечего проверять</strong>
+      Добавьте первый URL — первая проверка пройдёт в течение секунды.
+    </div>
+  </section>
+
+  <footer>
+    <span>pingwatch 0.1 · Go + SQLite · один бинарник, без внешних сервисов</span>
+    <span>API: <code>GET /api/targets</code></span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var REFRESH_MS = 5000;
+  var HISTORY_LIMIT = 30;
+
+  var elements = {
+    rows: document.getElementById("rows"),
+    empty: document.getElementById("empty"),
+    error: document.getElementById("error"),
+    form: document.getElementById("add-form"),
+    addButton: document.getElementById("add-button"),
+    refreshNote: document.getElementById("refresh-note"),
+    statTotal: document.getElementById("stat-total"),
+    statUp: document.getElementById("stat-up"),
+    statDown: document.getElementById("stat-down"),
+    statUptime: document.getElementById("stat-uptime")
+  };
+
+  var refreshing = false;
+
+  function api(path, options) {
+    var init = Object.assign({ headers: { "Content-Type": "application/json" } }, options || {});
+    return fetch(path, init).then(function (response) {
+      if (response.status === 204) return null;
+      return response.json().catch(function () { return null; }).then(function (body) {
+        if (!response.ok) {
+          throw new Error((body && body.error) || ("HTTP " + response.status));
+        }
+        return body;
+      });
+    });
+  }
+
+  function showError(message) {
+    if (!message) {
+      elements.error.classList.add("hidden");
+      elements.error.textContent = "";
+      return;
+    }
+    elements.error.textContent = message;
+    elements.error.classList.remove("hidden");
+  }
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+
+  function relativeTime(iso) {
+    if (!iso) return "—";
+    var then = new Date(iso).getTime();
+    if (!isFinite(then)) return "—";
+
+    var seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
+    if (seconds < 5) return "только что";
+    if (seconds < 60) return seconds + " с назад";
+
+    var minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return minutes + " мин назад";
+
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + " ч назад";
+
+    return Math.floor(hours / 24) + " дн назад";
+  }
+
+  function statusLabel(status) {
+    if (status === "up") return "доступен";
+    if (status === "down") return "недоступен";
+    return "нет данных";
+  }
+
+  function statusClass(status) {
+    if (status === "up" || status === "down") return status;
+    return "unknown";
+  }
+
+  function latencyText(ms, status) {
+    if (status === "unknown" || ms === undefined || ms === null) return "—";
+    if (ms === 0) return "< 1 ms";
+    return ms + " ms";
+  }
+
+  function uptimeText(history) {
+    if (!history.length) return "—";
+    var up = history.filter(function (item) { return item.status === "up"; }).length;
+    return (Math.round((up / history.length) * 1000) / 10) + "%";
+  }
+
+  function sparkline(history) {
+    var box = el("div", "spark");
+    if (!history.length) {
+      return el("span", "spark-empty", "нет проверок");
+    }
+
+    // Сервер отдаёт новые сверху, на графике время идёт слева направо.
+    history.slice().reverse().forEach(function (item) {
+      var bar = el("i", statusClass(item.status));
+      bar.title = statusLabel(item.status) + " · " +
+        (item.latency_ms > 0 ? item.latency_ms + " ms · " : "") +
+        new Date(item.checked_at).toLocaleString("ru-RU");
+      box.appendChild(bar);
+    });
+
+    return box;
+  }
+
+  function renderRow(target, history) {
+    var row = document.createElement("tr");
+    var status = statusClass(target.status);
+
+    var nameCell = el("td");
+    nameCell.appendChild(el("div", "target-name", target.name));
+    nameCell.appendChild(el("div", "target-url", target.url));
+    if (target.status === "down" && target.last_error) {
+      nameCell.appendChild(el("div", "target-error", target.last_error));
+    }
+    row.appendChild(nameCell);
+
+    var statusCell = el("td");
+    statusCell.appendChild(el("span", "pill " + status, statusLabel(target.status)));
+    var interval = el("div", "sub", "каждые " + target.interval_seconds + " с");
+    statusCell.appendChild(interval);
+    row.appendChild(statusCell);
+
+    var latencyCell = el("td");
+    latencyCell.appendChild(el("span", "num", latencyText(target.last_latency_ms, target.status)));
+    row.appendChild(latencyCell);
+
+    var uptimeCell = el("td");
+    uptimeCell.appendChild(el("span", "num", uptimeText(history)));
+    uptimeCell.appendChild(el("div", "sub", "из " + history.length + " проверок"));
+    row.appendChild(uptimeCell);
+
+    var sparkCell = el("td");
+    sparkCell.appendChild(sparkline(history));
+    row.appendChild(sparkCell);
+
+    var checkedCell = el("td");
+    checkedCell.appendChild(el("span", "num", relativeTime(target.last_checked_at)));
+    row.appendChild(checkedCell);
+
+    var actions = el("td");
+    var remove = el("button", "remove", "✕");
+    remove.type = "button";
+    remove.title = "Удалить цель";
+    remove.setAttribute("aria-label", "Удалить " + target.name);
+    remove.addEventListener("click", function () { removeTarget(target); });
+    actions.appendChild(remove);
+    row.appendChild(actions);
+
+    return row;
+  }
+
+  function render(targets, histories) {
+    var up = 0;
+    var down = 0;
+    var uptimeSum = 0;
+    var withHistory = 0;
+
+    elements.rows.textContent = "";
+
+    targets.forEach(function (target) {
+      var history = histories[target.id] || [];
+
+      if (target.status === "up") up++;
+      if (target.status === "down") down++;
+
+      if (history.length) {
+        var upCount = history.filter(function (item) { return item.status === "up"; }).length;
+        uptimeSum += (upCount / history.length) * 100;
+        withHistory++;
+      }
+
+      elements.rows.appendChild(renderRow(target, history));
+    });
+
+    elements.statTotal.textContent = targets.length;
+    elements.statUp.textContent = up;
+    elements.statDown.textContent = down;
+    elements.statUptime.textContent = withHistory
+      ? (Math.round((uptimeSum / withHistory) * 10) / 10) + "%"
+      : "—";
+
+    elements.empty.classList.toggle("hidden", targets.length !== 0);
+  }
+
+  function load() {
+    if (refreshing) return;
+    refreshing = true;
+
+    api("/api/targets")
+      .then(function (data) {
+        var targets = (data && data.items) || [];
+
+        return Promise.all(targets.map(function (target) {
+          return api("/api/targets/" + target.id + "/results?limit=" + HISTORY_LIMIT)
+            .then(function (body) { return body.items || []; })
+            .catch(function () { return []; });
+        })).then(function (lists) {
+          var histories = {};
+          targets.forEach(function (target, index) { histories[target.id] = lists[index]; });
+
+          render(targets, histories);
+          showError("");
+          elements.refreshNote.textContent = "обновлено " + new Date().toLocaleTimeString("ru-RU");
+        });
+      })
+      .catch(function (error) {
+        showError("Не удалось загрузить данные: " + error.message);
+      })
+      .then(function () { refreshing = false; });
+  }
+
+  function removeTarget(target) {
+    if (!window.confirm('Удалить "' + target.name + '" и всю историю проверок?')) return;
+
+    api("/api/targets/" + target.id, { method: "DELETE" })
+      .then(function () {
+        showError("");
+        load();
+      })
+      .catch(function (error) { showError("Не удалось удалить: " + error.message); });
+  }
+
+  elements.form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    var form = new FormData(elements.form);
+    var payload = {
+      name: String(form.get("name") || "").trim(),
+      url: String(form.get("url") || "").trim(),
+      interval_seconds: Number(form.get("interval_seconds")),
+      timeout_seconds: Number(form.get("timeout_seconds"))
+    };
+
+    elements.addButton.disabled = true;
+
+    api("/api/targets", { method: "POST", body: JSON.stringify(payload) })
+      .then(function () {
+        elements.form.reset();
+        showError("");
+        load();
+      })
+      .catch(function (error) { showError("Не удалось добавить цель: " + error.message); })
+      .then(function () { elements.addButton.disabled = false; });
+  });
+
+  load();
+  setInterval(load, REFRESH_MS);
+  window.addEventListener("focus", load);
+})();
+</script>
+</body>
+</html>
