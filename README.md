@@ -1,5 +1,12 @@
 # pingwatch
 
+[![ci](https://github.com/Hopfi3721/pingwatch/actions/workflows/ci.yml/badge.svg)](https://github.com/Hopfi3721/pingwatch/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/Hopfi3721/pingwatch?sort=semver)](https://github.com/Hopfi3721/pingwatch/releases)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![go](https://img.shields.io/github/go-mod/go-version/Hopfi3721/pingwatch)](go.mod)
+
+**Русский** | [English](README.en.md)
+
 Монитор доступности на Go: периодически проверяет HTTP-эндпоинты, хранит историю
 латентности и присылает алерт в Telegram, когда сервис действительно упал —
 один раз, а не каждые 30 секунд.
@@ -35,13 +42,30 @@ go run ./cmd/pingwatch
 Открыть <http://localhost:8080>, добавить первый URL в форму. Первая проверка
 пройдёт в течение секунды.
 
+### Готовый бинарник
+
+Скачать архив под свою ОС со страницы [releases](https://github.com/Hopfi3721/pingwatch/releases),
+распаковать и запустить:
+
+```bash
+./pingwatch            # Linux / macOS
+./pingwatch.exe        # Windows
+./pingwatch --version  # версия сборки
+```
+
 ### Docker
 
 ```bash
 docker compose up --build
 ```
 
-Или вручную:
+Или готовый образ из GitHub Container Registry:
+
+```bash
+docker run -p 8080:8080 -v pingwatch-data:/data ghcr.io/hopfi3721/pingwatch:latest
+```
+
+Или вручную из исходников:
 
 ```bash
 docker build -t pingwatch .
