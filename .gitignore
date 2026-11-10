@@ -1,6 +1,6 @@
 # Бинарники
-pingwatch
-pingwatch.exe
+/pingwatch
+/pingwatch.exe
 /dist/
 
 # Локальная база и её WAL-файлы

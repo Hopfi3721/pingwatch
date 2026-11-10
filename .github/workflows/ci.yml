@@ -35,5 +35,8 @@ jobs:
       - name: build
         run: go build ./...
 
+      - name: build binary
+        run: go build -o pingwatch ./cmd/pingwatch
+
       - name: test
         run: go test -race ./...

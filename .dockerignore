@@ -4,6 +4,6 @@
 *.db
 *.db-shm
 *.db-wal
-pingwatch
-pingwatch.exe
+/pingwatch
+/pingwatch.exe
 docs
